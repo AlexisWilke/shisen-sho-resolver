@@ -48,11 +48,14 @@ public:
     int             run();
 
 private:
+    typedef std::int8_t              tile_t;
+
     // key is board_position(column, row);
     // value is the tile number
-    typedef std::map<short, int8_t>  board_t;
+    //
+    typedef std::map<short, tile_t>  board_t;
 
-    enum direction_t : uint8_t
+    enum direction_t : std::uint8_t
     {
         DIRECTION_NONE,
 
@@ -64,12 +67,12 @@ private:
     struct position_t
     {
         typedef std::list<position_t>               list_t;
-        typedef std::map<int8_t, list_t>            map_t;  // key is item number (1 to 36 in our case)
+        typedef std::map<tile_t, list_t>            map_t;  // key is item number (1 to 36 in our case)
 
         direction_t f_direction = DIRECTION_NONE;
-        int8_t      f_turns = -1;
-        int8_t      f_column = -1;
-        int8_t      f_row = -1;
+        //int8_t      f_turns = -1;
+        std::int8_t f_column = -1;
+        std::int8_t f_row = -1;
 
         bool same_position(position_t const & p) const
         {
@@ -85,6 +88,7 @@ private:
         position_t  f_p1 = {};
         position_t  f_p2 = {};
         vector_t    f_children = vector_t();
+        tile_t      f_tile = 0;
     };
 
     void                usage();
@@ -143,6 +147,7 @@ private:
     int                 board_position(position_t const & p);
     bool                next_position(position_t & p);
     void                remove_tile(position_t const & p);
+    void                restore_tile(position_t const & p, tile_t tile);
     step_t::vector_t    match_tiles(position_t const & p1);
     bool                find_connection(position_t p1, position_t p2);
     bool                connect_left(position_t p1, position_t p2);
@@ -169,7 +174,7 @@ private:
     std::string         f_generate_tiles = std::string();
 
     Magick::Image       f_image = Magick::Image();
-    std::vector<std::uint8_t const *>
+    std::vector<std::uint8_t const *> // this is the RGB data
                         f_tiles = std::vector<std::uint8_t const *>();
     int                 f_tile_width = 0;
     int                 f_tile_height = 0;
@@ -622,9 +627,6 @@ int resolver::save_board()
     Magick::Geometry dimensions(Magick::Geometry(ORIGINAL_TILE_WIDTH * f_columns, ORIGINAL_TILE_HEIGHT * f_rows, 0, 0));
     Magick::Image board(dimensions, black);
     Magick::PixelPacket * data(board.setPixels(0, 0, ORIGINAL_TILE_WIDTH * f_columns, ORIGINAL_TILE_HEIGHT * f_rows));
-
-    //std::vector<std::uint8_t> image(f_rows * ORIGINAL_TILE_HEIGHT * f_columns * ORIGINAL_TILE_WIDTH * 3);
-    //std::uint8_t * data(image.data());
     Magick::PixelPacket * data_end(data + ORIGINAL_TILE_WIDTH * f_columns * 3 * ORIGINAL_TILE_HEIGHT * f_rows);
 
     // TODO: to make it much more practical (easier to read) we would have
@@ -788,31 +790,41 @@ int resolver::resolve_board()
 int move(1);
 
     position_t p1{
-        .f_direction = DIRECTION_NONE,  // next position is not position driven for this one
         .f_column = 0,
         .f_row = 0,
     };
+    bool reset(false);
+    bool empty(true);
     for(;;)
     {
-        if(f_board[board_position(p1)] == 0)
-        {
-            if(!next_position(p1))
-            {
-                // resolved--all tiles were removed
-                //
-                return 0;
-            }
-            continue;
-        }
+        empty = false;
         step_t::vector_t const matches(match_tiles(p1));
         if(matches.size() > 0)
         {
-            std::for_each(matches.begin(), matches.end(), [&current_step](step_t::pointer_t s) {
+            reset = true;
+            int const tile(f_board[board_position(p1)]);
+            std::for_each(matches.begin(), matches.end(), [&current_step, tile](step_t::pointer_t s) {
                     s->f_parent = current_step;
+                    s->f_tile = tile;
                 });
             current_step->f_children.insert(current_step->f_children.end(), matches.begin(), matches.end());
+std::cerr << "---------- removing p1 ("
+<< static_cast<int>(p1.f_column) << ", " << static_cast<int>(p1.f_row) << ") and p2 ("
+<< static_cast<int>(matches[0]->f_p2.f_column) << ", " << static_cast<int>(matches[0]->f_p2.f_row) << ").\n";
             remove_tile(p1);
-            remove_tile(matches[0]->f_p2);
+
+            position_t p2(matches[0]->f_p2);
+            if(p2.f_column == p1.f_column
+            && p2.f_row < p1.f_row)
+            {
+                // special case were p2 is in the same column as p1
+                // and p1 was under p2, in that case, p2 moved down
+                // by one row!
+                //
+                ++p2.f_row;
+            }
+            remove_tile(p2);
+
             current_step = matches[0];
 
 {
@@ -823,12 +835,93 @@ std::cerr << "--- save extra board [" << f_save_board << "]\n";
 save_board();
 ++move;
 }
+
+            // reset position for next search
+            //
+            p1.f_column = 0;
+            p1.f_row = 0;
+            while(f_board[board_position(p1)] == 0)
+            {
+                if(!next_position(p1))
+                {
+                    throw std::logic_error("we just restore a tile so at least there is that one on the screen, right?");
+                }
+            }
+            continue;
         }
-        else
+        do
         {
-std::cerr << "---------- TODO: revert last move and try the next one.\n";
-break;
+            if(!next_position(p1))
+            {
+                if(!reset)
+                {
+                    if(empty)
+                    {
+std::cerr << "----------- reached the end for the second time and no tiles, we're done\n";
+                        return 0;
+                    }
+std::cerr << "----------- reached the end and !empty so this is a deadend (not a solution); try next branch in tree...\n";
+std::cerr << "--- current step: p1 ("
+<< static_cast<int>(current_step->f_p1.f_column) << ", " << static_cast<int>(current_step->f_p1.f_row) << ") and p2 ("
+<< static_cast<int>(current_step->f_p2.f_column) << ", " << static_cast<int>(current_step->f_p2.f_row) << ").\n";
+
+                    // we may have to go up our tree multiple times in a row
+                    //
+                    for(;;)
+                    {
+                        p1 = current_step->f_p1;
+                        position_t p2(current_step->f_p2);
+                        if(p2.f_column == p1.f_column
+                        && p2.f_row < p1.f_row)
+                        {
+                            // special case were p2 is in the same column as p1
+                            // and p1 was under p2, in that case, p2 moved down
+                            // by one row!
+                            //
+                            ++p2.f_row;
+                        }
+                        restore_tile(p2, current_step->f_tile);
+                        restore_tile(p1, current_step->f_tile);
+{
+std::stringstream filename;
+filename << "boards/restore-" << move << ".txt";
+f_save_board = filename.str();
+std::cerr << "--- restored: save extra board [" << f_save_board << "] ("
+<< current_step->f_children.size() << ")\n";
+save_board();
+++move;
+}
+                        if(!current_step->f_children.empty())
+                        {
+                            throw std::logic_error("current_step has children when restoring?");
+                        }
+                        step_t::pointer_t parent(current_step->f_parent);
+                        if(parent->f_children.empty())
+                        {
+                            throw std::logic_error("parent has no children, not even current_step?");
+                        }
+                        if(parent->f_children[0] != current_step)
+                        {
+                            throw std::logic_error("parent first child is not current_step?");
+                        }
+                        parent->f_children.erase(parent->f_children.begin());
+                        if(!parent->f_children.empty())
+                        {
+                            current_step = parent->f_children[0];
+                            break;
+                        }
+                        current_step = parent;
+                    }
+std::cerr << "----------- loop again -- after a step back...\n";
+                }
+std::cerr << "----------- reached the end...\n";
+                reset = false;
+                empty = true;
+                p1.f_column = 0;
+                p1.f_row = 0;
+            }
         }
+        while(f_board[board_position(p1)] == 0);
     }
 
     return 1;
@@ -1189,9 +1282,9 @@ bool resolver::connect_left(position_t p1, position_t p2)
         {
             return false;
         }
-        if(p1.same_position(p2))
+        if(f_board[board_position(p1)] != 0)
         {
-            return true;
+            return p1.same_position(p2);
         }
     }
 }
@@ -1210,9 +1303,9 @@ bool resolver::connect_right(position_t p1, position_t p2)
         {
             return false;
         }
-        if(p1.same_position(p2))
+        if(f_board[board_position(p1)] != 0)
         {
-            return true;
+            return p1.same_position(p2);
         }
     }
 }
@@ -1796,7 +1889,7 @@ void resolver::remove_tile(position_t const & p)
     int r(p.f_row);
     while(r > 0)
     {
-        int8_t const item(f_board[board_position(p.f_column, r - 1)]);
+        tile_t const item(f_board[board_position(p.f_column, r - 1)]);
         f_board[board_position(p.f_column, r)] = item;
         if(item == 0)
         {
@@ -1805,6 +1898,24 @@ void resolver::remove_tile(position_t const & p)
         --r;
     }
     f_board[board_position(p.f_column, r)] = 0;
+}
+
+
+void resolver::restore_tile(position_t const & p, tile_t tile)
+{
+    if(f_board[board_position(p.f_column, 0)] != 0)
+    {
+        throw std::logic_error(
+              "trying to restore in a full column ("
+            + std::to_string(p.f_column)
+            + ").");
+    }
+
+    for(int r(1); r <= p.f_row; ++r)
+    {
+        f_board[board_position(p.f_column, r - 1)] = f_board[board_position(p.f_column, r)];
+    }
+    f_board[board_position(p.f_column, p.f_row)] = tile;
 }
 
 

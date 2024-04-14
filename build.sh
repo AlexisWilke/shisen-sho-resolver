@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 #
 
 GENERATE=""
@@ -98,6 +98,7 @@ then
 		BUILD/shisen-sho-resolver --generate-tiles tiles.cpp sample1.png
 	else
 		mkdir -p boards
+		rm -f boards/board-*.txt boards/board-*.png boards/restore-*.png
 		BUILD/shisen-sho-resolver "$SAMPLE" --save-board boards/board.txt
 	fi
 fi
