@@ -1,7 +1,6 @@
 #!/bin/sh -e
 #
 
-GENERATE=""
 HELP=""
 RESET=""
 RUN=""
@@ -10,7 +9,7 @@ while test -n "$1"
 do
 	case "$1" in
 	"--generate"|"-g")
-		GENERATE="1"
+		RUN="3"
 		shift
 		;;
 
@@ -34,11 +33,28 @@ do
 		shift
 		;;
 
+	"--board-to-image"|"-i")
+		shift
+		if test -z "$1"
+		then
+			echo "error: --board-to-image requires an argument."
+			exit 1
+		fi
+		if test ! -f "$1"
+		then
+			echo "error: board \"$1\" not found."
+			exit 1
+		fi
+		BOARD="$1"
+		RUN="2"
+		shift
+		;;
+
 	"--sample"|"-s")
 		shift
 		if test -z "$1"
 		then
-			echo "error: --sample require an argument."
+			echo "error: --sample requires an argument."
 			exit 1
 		fi
 		if test ! -f "$1"
@@ -91,15 +107,21 @@ else
 	make -C BUILD 2>&1 | less -SR
 fi
 
-if test -n "$RUN"
-then
-	if test -n "$GENERATE"
-	then
-		BUILD/shisen-sho-resolver --generate-tiles tiles.cpp sample1.png
-	else
-		mkdir -p boards
-		rm -f boards/board-*.txt boards/board-*.png boards/restore-*.png
-		BUILD/shisen-sho-resolver "$SAMPLE" --save-board boards/board.txt
-	fi
-fi
+case "$RUN" in
+"1")
+	mkdir -p boards
+	rm -f boards/*-board.txt boards/*-board.png boards/*-restore.txt boards/*-restore.png
+	BUILD/shisen-sho-resolver "$SAMPLE" --save-board boards/board.txt
+	;;
+
+"2")
+	echo "---------- BUILD/shisen-sho-resolver --save-board-only --save-board board.png \"$BOARD\""
+	BUILD/shisen-sho-resolver --save-board-only --save-board board.png "$BOARD"
+	;;
+
+"3")
+	BUILD/shisen-sho-resolver --generate-tiles tiles.cpp sample1.png
+	;;
+
+esac
 
