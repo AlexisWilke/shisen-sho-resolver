@@ -109,8 +109,8 @@ fi
 
 case "$RUN" in
 "1")
-	mkdir -p boards
-	rm -f boards/*-board.txt boards/*-board.png boards/*-restore.txt boards/*-restore.png
+	rm -rf boards
+	mkdir boards
 	BUILD/shisen-sho-resolver "$SAMPLE" --save-board boards/board.txt
 	;;
 

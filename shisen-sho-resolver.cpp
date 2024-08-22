@@ -714,7 +714,6 @@ int resolver::save_board(bool save_image)
     {
         // this is not an error, just no save if no name specified
         //
-std::cerr << "--- skip on saving!?\n";
         return 0;
     }
 
@@ -1005,7 +1004,9 @@ save_board();
                 {
                     if(!next_position(p1))
                     {
-                        throw std::logic_error("we just restore a tile so at least there is that one on the screen, right?");
+                        //throw std::logic_error("we just restore a tile so at least there is that one on the screen, right?");
+                        std::cout << "info: board resolved.\n";
+                        return 0;
                     }
                 }
                 continue;
@@ -1140,7 +1141,7 @@ save_board();
                             {
 std::cerr << "---------- " << move << ". removing case II -- p1 ("
 << static_cast<int>(p1.f_column) << ", " << static_cast<int>(p1.f_row) << ") and p2 ("
-<< static_cast<int>(matches[0]->f_p2.f_column) << ", " << static_cast<int>(matches[0]->f_p2.f_row) << ").\n";
+<< static_cast<int>(p2.f_column) << ", " << static_cast<int>(p2.f_row) << ").\n";
 
                                 reset = true;
                                 empty = false;
@@ -1168,7 +1169,9 @@ save_board();
                                 {
                                     if(!next_position(p1))
                                     {
-                                        throw std::logic_error("we just restore a tile so at least there is that one on the screen, right?");
+                                        //throw std::logic_error("we just restore a tile so at least there is that one on the screen, right?");
+                                        std::cout << "info: board resolved.\n";
+                                        return 0;
                                     }
                                 }
                                 goto go_to_next_position;
