@@ -50,7 +50,7 @@ all combos. A/B, A/C, A/D, and later it is likely to test B/A, B/C, B/D,
 etc.
 
 I use board size 18x8 because I find that one the most challenging. Smaller
-or large baords are generally very easy to solve (in my own personal tests).
+or large boards are generally very easy to solve (in my own personal tests).
 Of course, once in a while, some 18x8 are very easy to resolve too.
 
 # Build & Run Tool
@@ -73,7 +73,7 @@ the software.
 
 The `save_board()` can save the board in text format, with each time
 represented by a number (0 to 36, where 0 represents "no tile here").
-I also save the result in a .png which allows for comparing ina much
+I also save the result in a .png which allows for comparing in a much
 easier manner than trying to read the .txt file.
 
 The intermediate saves are not automatic. I tweak my code with
@@ -118,8 +118,5 @@ Once regenerated, don't forget to restore that preprocessor entry.
 
 Feel free to post issues or propose pull requests. However, this is just
 a pass time tool so I'm not very likely to work on it more than this.
-
-**IMPORTANT:** At time of writing the search is not yet complete. Actually,
-it pretty much doesn't work at all (it may remove one pair of tiles...) Bare
-with me if you want to use this or go work on your own fork.
-
+However, the search works. It finds a solution when at least one is
+available and fails when none are available.
